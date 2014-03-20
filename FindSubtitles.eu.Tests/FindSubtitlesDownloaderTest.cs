@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Text;
 using System.Collections.Generic;
@@ -40,19 +41,23 @@ namespace FindSubtitlesEUDownloaderTests
       List<Subtitle> subtitles = target.SearchSubtitles(query);
 
       Assert.IsTrue(subtitles.Count > 0);
+      Debug.WriteLine("Subtitles count = {0}", subtitles.Count);
 
       List<FileInfo> fileInfos = target.SaveSubtitle(subtitles[0]);
 
       Assert.IsTrue(fileInfos[0].Exists);
+      Debug.WriteLine(fileInfos[0].FullName);
 
       query = new SearchQuery("nord") { LanguageCodes = new[] { "gre" } };
       subtitles = target.SearchSubtitles(query);
 
       Assert.IsTrue(subtitles.Count > 0);
+      Debug.WriteLine("Subtitles count = {0}", subtitles.Count);
 
       fileInfos = target.SaveSubtitle(subtitles[0]);
 
       Assert.IsTrue(fileInfos[0].Exists);
+      Debug.WriteLine(fileInfos[0].FullName);
     }
 
     [TestMethod]
@@ -110,6 +115,7 @@ namespace FindSubtitlesEUDownloaderTests
 
       Assert.IsTrue(fileInfos[0].Exists);
       Assert.AreEqual(fileInfos[0].Extension,".sub","Downloaded file is not a subtitle");
+      Debug.WriteLine(fileInfos[0].FullName);
 
     }
 
@@ -123,6 +129,14 @@ namespace FindSubtitlesEUDownloaderTests
       List<Subtitle> actual = target.SearchSubtitles(query);
 
       Assert.IsTrue(actual.Count > 0);
+      Debug.WriteLine("Subtitles count = {0}", actual.Count);
+
+      query = new EpisodeSearchQuery("Game of thrones", 2, 5) { LanguageCodes = new[] { "gre" } };
+
+      actual = target.SearchSubtitles(query);
+
+      Assert.IsTrue(actual.Count > 0);
+      Debug.WriteLine("Subtitles count = {0}", actual.Count);
     }
 
     [TestMethod()]
@@ -150,6 +164,7 @@ namespace FindSubtitlesEUDownloaderTests
       List<FileInfo> fileInfos = target.SaveSubtitle(subtitles[0]);
 
       Assert.IsTrue(fileInfos[0].Exists);
+      Debug.WriteLine(fileInfos[0].FullName);
     }
 
     [TestMethod()]
@@ -166,7 +181,9 @@ namespace FindSubtitlesEUDownloaderTests
       {
         List<FileInfo> fileInfos = target.SaveSubtitle(subtitles[i]);
 
-        Assert.IsTrue(fileInfos[0].Exists, string.Format("No subtitle files downloaded for Monk S8 E16, option {0} ", i));
+        if (fileInfos.Count > 0)
+          Assert.IsTrue(fileInfos[0].Exists,
+                        string.Format("No subtitle files downloaded for Monk S8 E16, option {0} ", i));
       }
 
       query = new EpisodeSearchQuery("NCIS", 2, 5) { LanguageCodes = new[] { "gre" } };
@@ -178,8 +195,24 @@ namespace FindSubtitlesEUDownloaderTests
       {
         List<FileInfo> fileInfos = target.SaveSubtitle(subtitles[i]);
 
-        Assert.IsTrue(fileInfos[0].Exists, string.Format("No subtitle files downloaded for NCIS S2 E5, option {0}", i));
+        if (fileInfos.Count > 0)
+          Assert.IsTrue(fileInfos[0].Exists, string.Format("No subtitle files downloaded for NCIS S2 E5, option {0}", i));
       }
+
+      query = new EpisodeSearchQuery("Game of thrones", 2, 5) { LanguageCodes = new[] { "gre" } };
+      subtitles = target.SearchSubtitles(query);
+
+      Assert.IsTrue(subtitles.Count > 0, "No sutitles returned for Game of Thrones S2 E5");
+
+      for (int i = 0; i < subtitles.Count; i++)
+      {
+        List<FileInfo> fileInfos = target.SaveSubtitle(subtitles[i]);
+
+        if (fileInfos.Count > 0)
+          Assert.IsTrue(fileInfos[0].Exists, string.Format("No subtitle files downloaded for Game of Thrones S2 E5, option {0}", i));
+      }
+
+
     }
 
 

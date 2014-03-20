@@ -10,7 +10,8 @@ namespace findsubtitles.eu
 {
   internal class SeriesDefaultSubEntryParser : ISubtitleEntryParser
   {
-    private static Regex _getIdRegEx = new Regex(@"\?Id=([0-9]+)\&", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    //private static Regex _getIdRegEx = new Regex(@"\?Id=([0-9]+)\&", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static Regex _getIdRegEx = new Regex(@"\?(Id=[0-9]+\&site=[a-z]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     
     public string XPath
     {
@@ -25,24 +26,25 @@ namespace findsubtitles.eu
 
     public string GetDownloadUrl(string subtitleId)
     {
-      string downloadPageUrl = "http://www.tvsubtitles.eu/download.php?id=" + subtitleId + "&site=tv";
-      var web = new HtmlWeb();
+      //string downloadPageUrl = "http://www.tvsubtitles.eu/download.php?id=" + subtitleId + "&site=tv";
+      string downloadPageUrl = "http://www.tvsubtitles.eu/download.php?" + subtitleId;
+      var web = new GZHtmlWeb();
       HtmlDocument resultsPage = web.Load(downloadPageUrl);
       HtmlNode subtitleNode = resultsPage.DocumentNode.SelectNodes("//div[@class='menu_d']/a[span='Download Subtitle']").FirstOrDefault();
-      downloadPageUrl = (subtitleNode != null) ? new Uri(new Uri(downloadPageUrl),  subtitleNode.GetAttributeValue("href","")).ToString() : null;
-      if (downloadPageUrl == null)
+      string downloadSubsUrl = (subtitleNode != null) ? new Uri(new Uri(downloadPageUrl),  subtitleNode.GetAttributeValue("href","")).ToString() : null;
+      if (downloadSubsUrl == null)
       {
         subtitleNode = resultsPage.DocumentNode.SelectNodes("//div[@id='down_msg']/a").FirstOrDefault();
-        downloadPageUrl = (subtitleNode != null)
+        downloadSubsUrl = (subtitleNode != null)
                             ? new Uri(new Uri(downloadPageUrl), subtitleNode.GetAttributeValue("href", "")).ToString()
                             : null;
       }
-      return downloadPageUrl;
+      return downloadSubsUrl;
     }
 
     public Subtitle CreateSub(string subtitleId, string programName, string fileName, string languageCode)
     {
-      return new Subtitle(subtitleId, programName, fileName, languageCode);
+      return new SubtitleEx(subtitleId, programName, fileName, languageCode, this);
     }
   }
 }

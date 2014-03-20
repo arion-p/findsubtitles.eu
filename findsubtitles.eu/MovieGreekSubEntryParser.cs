@@ -28,7 +28,7 @@ namespace findsubtitles.eu
 
     public Subtitle CreateSub(string subtitleId, string programName, string fileName, string languageCode)
     {
-      return new Subtitle(subtitleId, programName, fileName, languageCode);
+      return new SubtitleEx(subtitleId, programName, fileName, languageCode, this);
     }
   }
 }

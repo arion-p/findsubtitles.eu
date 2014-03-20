@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -47,7 +48,7 @@ namespace SubtitleDownloader.Implementations.FindSubtitlesEU
 
     public List<Subtitle> SearchSubtitles(SearchQuery query)
     {
-      string url = SearchUrlBase + query.Query;
+      string url = SearchUrlBase + Uri.EscapeDataString(query.Query);
 
       //if (query.Year.HasValue)
       //{
@@ -59,8 +60,8 @@ namespace SubtitleDownloader.Implementations.FindSubtitlesEU
     public List<Subtitle> SearchSubtitles(EpisodeSearchQuery query)
     {
       //throw new NotSupportedException();
-      string url = SearchSeriesUrlBase 
-                   + "?t=" + query.SerieTitle
+      string url = SearchSeriesUrlBase
+                   + "?t=" + Uri.EscapeDataString(query.SerieTitle)
                    + "&s=" + query.Season
                    + "&e=" + query.Episode;
 
@@ -76,40 +77,64 @@ namespace SubtitleDownloader.Implementations.FindSubtitlesEU
     {
       //var downloadBaseUrl = subtitle.LanguageCode == "gre" ? DownloadPageUrlGreek : DownloadPageUrl;
       //string url = downloadBaseUrl + subtitle.Id;
-      var uri = new Uri(subtitle.FileName);
+      var subEx = subtitle as SubtitleEx;
+      if (subEx == null)
+        throw new Exception("No download link found for subtitle!");
+
+      var uri = new Uri(subEx.Parser.GetDownloadUrl(subEx.Id));
 
       string archiveFile = Path.GetTempFileName();
 
-      var client = new WebClient();
+      var client = new GZipWebClient();
       client.DownloadFile(uri, archiveFile);
       // Handle meta-refresh
       if (client.ResponseHeaders["Content-Type"] == "text/html")
       {
-        var web = new HtmlWeb();
+        var web = new GZHtmlWeb();
         HtmlDocument redirectPage = web.Load(archiveFile);
         var node = redirectPage.DocumentNode.SelectSingleNode("//meta[@http-equiv='refresh']");
         if (node != null)
         {
           uri = new Uri(uri, node.GetAttributeValue("content", "").Split(new[]{"url="}, 2, StringSplitOptions.None )[1]);
-          client.DownloadFile(uri, archiveFile);
         }
+        else
+        {
+          node = redirectPage.DocumentNode.SelectSingleNode("//body[starts-with(@onload, 'download(')]");
+          if(node != null)
+          {
+            uri = new Uri(uri, node.GetAttributeValue("onload","").Substring(10).TrimEnd('\'',')'));
+          }
+        }
+        if (node != null)
+          client.DownloadFile(uri, archiveFile);
       }
       var files = new List<FileInfo>();
       var subs = new List<FileInfo>();
       //if (client.ResponseHeaders["Content-Type"] != "")
-      
-      files.Add(new FileInfo(archiveFile));
-      do
+
+      Debug.WriteLine("Content-Type: " + client.ResponseHeaders["Content-Type"]);
+      if (client.ResponseHeaders["Content-Type"] == "text/plain")
+      {
+        var subFilename = Path.Combine(Path.GetDirectoryName(archiveFile), Path.GetFileName(uri.LocalPath));
+        File.Move(archiveFile, subFilename);
+        subs.Add(new FileInfo(subFilename));
+      }
+      else if (client.ResponseHeaders["Content-Type"] == "text/html")
+        return subs;
+      else
+        files.Add(new FileInfo(archiveFile));
+
+      while (!subs.Any() && files.Any())
       {
         var innerContents = new List<FileInfo>();
-        innerContents = files.Aggregate(innerContents,(current, fi) =>
+        innerContents = files.Where(fi => fi.Length > 0)
+                             .Aggregate(innerContents,(current, fi) =>
                                         current.Concat(FileUtils.ExtractFilesFromZipOrRarFile(fi.FullName)).ToList());
         subs = innerContents.Where(fi => _subtitleExtensions.Contains(fi.Extension)).ToList();
         files = innerContents.Where(fi => _archiveExtensions.Contains(fi.Extension)).ToList();
-      } while (!subs.Any() && files.Any());
+      }
 
       return subs;
-      throw new Exception("No download link found for subtitle!");
     }
 
     public int SearchTimeout
@@ -130,7 +155,7 @@ namespace SubtitleDownloader.Implementations.FindSubtitlesEU
         string searchUrl = url + "&lang=" + languageName;
         //xmlReader = new XmlTextReader(url);
 
-        var web = new HtmlWeb();
+        var web = new GZHtmlWeb();
         HtmlDocument resultsPage = web.Load(searchUrl);
         ISubtitleEntryParser parser;
         if(!parsers.TryGetValue(languageCode, out parser))
@@ -149,11 +174,11 @@ namespace SubtitleDownloader.Implementations.FindSubtitlesEU
             string href = subtitleNode.GetAttributeValue("href", "");
             string subtitleId = parser.GetId(href);
             string releaseName = subtitleNode.InnerText;
-            string downloadUrl = parser.GetDownloadUrl(subtitleId);
+            //string downloadUrl = parser.GetDownloadUrl(subtitleId);
 
-            if (!String.IsNullOrEmpty(releaseName) && !String.IsNullOrEmpty(subtitleId) && !String.IsNullOrEmpty(downloadUrl))
+            if (!String.IsNullOrEmpty(releaseName) && !String.IsNullOrEmpty(subtitleId) /*&& !String.IsNullOrEmpty(downloadUrl)*/)
             {
-              results.Add(parser.CreateSub(subtitleId, releaseName, downloadUrl, languageCode));
+              results.Add(parser.CreateSub(subtitleId, releaseName, releaseName, languageCode));
             }
           }
         }
